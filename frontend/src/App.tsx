@@ -46,11 +46,11 @@ function App() {
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", maxWidth: "1100px", margin: "0 auto" }}>
       <h1 style={{ textAlign: "center", color: "#2563eb", fontSize: "40px" }}>
-        Sales Orders PWA
+        Rangdhara ERP
       </h1>
-      <p style={{ textAlign: "center", color: "#666", marginBottom: "30px" }}>
-        Offline First • Auto Sync with PostgreSQL
-      </p>
+      {/* <p style={{ textAlign: "center", color: "#666", marginBottom: "30px" }}>
+        Offline First
+      </p> */}
 
       <div style={{ textAlign: "center", marginBottom: "20px" }}>
         <button

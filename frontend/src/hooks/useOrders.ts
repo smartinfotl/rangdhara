@@ -3,7 +3,7 @@ import { db, SalesOrder } from '../db';
 import toast from 'react-hot-toast';
 import { useCallback, useEffect } from 'react';
 
-const API_URL = 'http://localhost:5000/api/orders';
+const API_URL = 'http://192.168.10.18:5000/api/orders';
 
 export function useOrders() {
     const orders = useLiveQuery(() =>
@@ -38,13 +38,16 @@ export function useOrders() {
     }, []);
 
     const addOrder = async (data: Omit<SalesOrder, 'id' | 'created_at'>) => {
-        const newOrder = { ...data, isPendingSync: !navigator.onLine };
+        // const newOrder = { ...data, isPendingSync: !navigator.onLine };
+        // If online, syncPendingOrders() will immediately push and clear this flag.
+        const newOrder = { ...data, isPendingSync: true };
 
         await db.orders.add(newOrder as SalesOrder);
 
         if (navigator.onLine) await syncPendingOrders();
 
-        toast.success(newOrder.isPendingSync ? 'Saved offline (will sync when online)' : 'Order saved successfully!');
+        // toast.success(newOrder.isPendingSync ? 'Saved offline (will sync when online)' : 'Order saved successfully!');
+        toast.success(navigator.onLine ? 'Order saved successfully!' : 'Saved offline (will sync when online)');
     };
 
     const deleteOrder = async (id: number) => {
