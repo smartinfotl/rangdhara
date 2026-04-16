@@ -17,6 +17,18 @@ export class SalesOrderDB extends Dexie {
     this.version(1).stores({
       orders: '++id, order_number, customer_name, amount, isPendingSync'
     });
+    this.version(2)
+      .stores({
+        // Avoid indexing boolean fields (IndexedDB keys cannot be booleans).
+        orders: '++id, order_number, customer_name, amount'
+      })
+      .upgrade(async (tx) => {
+        await tx.table('orders').toCollection().modify((order: SalesOrder) => {
+          if (typeof order.isPendingSync !== 'boolean') {
+            order.isPendingSync = false;
+          }
+        });
+      });
   }
 }
 

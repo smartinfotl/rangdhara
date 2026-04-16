@@ -1,62 +1,71 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, SalesOrder } from '../db';
 import toast from 'react-hot-toast';
+import { useCallback, useEffect } from 'react';
 
 const API_URL = 'http://localhost:5000/api/orders';
 
 export function useOrders() {
-  const orders = useLiveQuery(() =>
-    db.orders.orderBy('id').reverse().toArray(), []);
+    const orders = useLiveQuery(() =>
+        db.orders.orderBy('id').reverse().toArray(), []);
 
-  const syncPendingOrders = async () => {
-    console.log("Syncing pending orders...");
-    const pending = await db.orders.where({ isPendingSync: true }).toArray();
+    const syncPendingOrders = useCallback(async () => {
+        console.log("Syncing pending orders...");
 
-    console.log(`Found ${pending.length} pending orders to sync.`);
+        const pending = await db.orders.filter((order) => order.isPendingSync === true).toArray();
 
-    for (const order of pending) {
-      try {
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order_number: order.order_number,
-            customer_name: order.customer_name,
-            amount: order.amount
-          })
-        });
+        console.log(`Found ${pending.length} pending orders to sync.`);
 
-        if (res.ok) {
-          await db.orders.update(order.id!, { isPendingSync: false });
+        for (const order of pending) {
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        order_number: order.order_number,
+                        customer_name: order.customer_name,
+                        amount: order.amount
+                    })
+                });
+
+                if (res.ok) {
+                    await db.orders.update(order.id!, { isPendingSync: false });
+                }
+            } catch (err) {
+                console.log("Sync failed for order", order.order_number);
+            }
         }
-      } catch (err) {
-        console.log("Sync failed for order", order.order_number);
-      }
-    }
-  };
+    }, []);
 
-  const addOrder = async (data: Omit<SalesOrder, 'id' | 'created_at'>) => {
-    const newOrder = { ...data, isPendingSync: !navigator.onLine };
+    const addOrder = async (data: Omit<SalesOrder, 'id' | 'created_at'>) => {
+        const newOrder = { ...data, isPendingSync: !navigator.onLine };
 
-    await db.orders.add(newOrder as SalesOrder);
+        await db.orders.add(newOrder as SalesOrder);
 
-    if (navigator.onLine) await syncPendingOrders();
+        if (navigator.onLine) await syncPendingOrders();
 
-    toast.success(newOrder.isPendingSync ? 'Saved offline (will sync when online)' : 'Order saved successfully!');
-  };
+        toast.success(newOrder.isPendingSync ? 'Saved offline (will sync when online)' : 'Order saved successfully!');
+    };
 
-  const deleteOrder = async (id: number) => {
-    await db.orders.delete(id);
-    if (navigator.onLine) {
-      try {
-        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-      } catch (e) {}
-    }
-    toast.success('Order deleted');
-  };
+    const deleteOrder = async (id: number) => {
+        await db.orders.delete(id);
+        if (navigator.onLine) {
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            } catch (e) { }
+        }
+        toast.success('Order deleted');
+    };
 
-  // Auto sync when back online
-  window.addEventListener('online', syncPendingOrders);
+    // Auto sync when back online
+    //   window.addEventListener('online', syncPendingOrders);
+    useEffect(() => {
+        window.addEventListener('online', syncPendingOrders);
+        return () => {
+            window.removeEventListener('online', syncPendingOrders);
+        };
+    }, [syncPendingOrders]);
 
-  return { orders: orders || [], addOrder, deleteOrder, syncPendingOrders };
+
+    return { orders: orders || [], addOrder, deleteOrder, syncPendingOrders };
 }
