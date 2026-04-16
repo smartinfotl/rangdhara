@@ -9,6 +9,45 @@ export function useOrders() {
     const orders = useLiveQuery(() =>
         db.orders.orderBy('id').reverse().toArray(), []);
 
+    const fetchOrdersFromApi = useCallback(async () => {
+        if (!navigator.onLine) return;
+
+        try {
+            const res = await fetch(API_URL);
+            if (!res.ok) return;
+
+            const serverOrders: SalesOrder[] = await res.json();
+
+            await db.transaction('rw', db.orders, async () => {
+                for (const order of serverOrders) {
+                    const existing = await db.orders
+                        .where('order_number')
+                        .equals(order.order_number)
+                        .first();
+
+                    if (existing?.id) {
+                        await db.orders.update(existing.id, {
+                            customer_name: order.customer_name,
+                            amount: Number(order.amount),
+                            created_at: order.created_at,
+                            isPendingSync: false,
+                        });
+                    } else {
+                        await db.orders.add({
+                            order_number: order.order_number,
+                            customer_name: order.customer_name,
+                            amount: Number(order.amount),
+                            created_at: order.created_at,
+                            isPendingSync: false,
+                        });
+                    }
+                }
+            });
+        } catch (err) {
+            console.log("Failed to fetch orders from API.");
+        }
+    }, []);
+
     const syncPendingOrders = useCallback(async () => {
         console.log("Syncing pending orders...");
 
@@ -35,7 +74,9 @@ export function useOrders() {
                 console.log("Sync failed for order", order.order_number);
             }
         }
-    }, []);
+
+        await fetchOrdersFromApi();
+    }, [fetchOrdersFromApi]);
 
     const addOrder = async (data: Omit<SalesOrder, 'id' | 'created_at'>) => {
         // const newOrder = { ...data, isPendingSync: !navigator.onLine };
@@ -61,7 +102,12 @@ export function useOrders() {
     };
 
     // Auto sync when back online
-    //   window.addEventListener('online', syncPendingOrders);
+    useEffect(() => {
+        if (navigator.onLine) {
+            fetchOrdersFromApi();
+        }
+    }, [fetchOrdersFromApi]);
+
     useEffect(() => {
         window.addEventListener('online', syncPendingOrders);
         return () => {
@@ -69,6 +115,5 @@ export function useOrders() {
         };
     }, [syncPendingOrders]);
 
-
-    return { orders: orders || [], addOrder, deleteOrder, syncPendingOrders };
+    return { orders: orders || [], addOrder, deleteOrder, syncPendingOrders, fetchOrdersFromApi };
 }
