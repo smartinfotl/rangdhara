@@ -3,7 +3,7 @@ import { db, SalesOrder } from '../db';
 import toast from 'react-hot-toast';
 import { useCallback, useEffect } from 'react';
 
-const API_URL = 'http://192.168.10.18:5000/api/orders';
+const API_URL = 'https://api.rangdharafabrics.com/api/orders';
 
 export function useOrders() {
     const orders = useLiveQuery(() =>
